@@ -46,6 +46,25 @@ The user running this script needs at minimum:
 - Read access to the Active Directory domain
 - For advanced features (unlocking accounts, resetting passwords), additional privileges are required
 
+## Using the Application
+
+### Basic Search
+1. Enter a search term in the search box
+2. Click "Search" or press Enter
+3. The tool will search across multiple fields (username, first name, last name, display name, email)
+4. Select a user from the results to view detailed information
+
+### Exporting User Details
+1. Search for and select a user from the results
+2. Click the "Export User Details" button
+3. Choose either "Export to CSV" or "Export to HTML"
+4. Select a location to save the file
+5. The exported file will contain all user details including:
+   - Basic information (name, email, etc.)
+   - Account status
+   - Login information
+   - Group memberships
+
 ## Troubleshooting
 
 ### Common Issues
@@ -61,3 +80,6 @@ The user running this script needs at minimum:
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
+
+4. **Export feature issues**:
+   If you encounter problems with the export functionality, ensure you have write permissions to the location where you're trying to save the files.
