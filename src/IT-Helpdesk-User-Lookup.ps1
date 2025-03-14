@@ -8,10 +8,16 @@ Add-Type -AssemblyName System.Drawing
 # Import the Active Directory module (requires RSAT tools installed)
 Import-Module ActiveDirectory
 
+
+Add-Type -AssemblyName System.Drawing
+
+# Import the Active Directory module (requires RSAT tools installed)
+Import-Module ActiveDirectory
+
 # Create the main form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "IT Helpdesk User Lookup Tool"
-$form.Size = New-Object System.Drawing.Size(750, 600)
+$form.Size = New-Object System.Drawing.Size(750, 700)  # Increased height from 600 to 700
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -85,17 +91,50 @@ $resultsList.Columns.Add("Locked Out", 100)
 $resultsList.Columns.Add("Department", 180)
 $form.Controls.Add($resultsList)
 
+# Create context menu for user actions
+$contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
+
+# Add unlock account menu item
+$unlockAccountMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$unlockAccountMenuItem.Text = "Unlock Account"
+$unlockAccountMenuItem.Enabled = $false
+$contextMenu.Items.Add($unlockAccountMenuItem)
+
+# Add reset password menu item
+$resetPasswordMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$resetPasswordMenuItem.Text = "Reset Password"
+$resetPasswordMenuItem.Enabled = $false
+$contextMenu.Items.Add($resetPasswordMenuItem)
+
+# Add enable/disable account menu item
+$toggleAccountMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$toggleAccountMenuItem.Text = "Enable/Disable Account"
+$toggleAccountMenuItem.Enabled = $false
+$contextMenu.Items.Add($toggleAccountMenuItem)
+
+# Separator
+$contextMenu.Items.Add("-")
+
+# Add refresh user info menu item
+$refreshMenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$refreshMenuItem.Text = "Refresh User Info"
+$refreshMenuItem.Enabled = $false
+$contextMenu.Items.Add($refreshMenuItem)
+
+# Assign context menu to listview
+$resultsList.ContextMenuStrip = $contextMenu
+
 # Create details groupbox
 $detailsBox = New-Object System.Windows.Forms.GroupBox
 $detailsBox.Location = New-Object System.Drawing.Point(20, 320)
-$detailsBox.Size = New-Object System.Drawing.Size(690, 220)
+$detailsBox.Size = New-Object System.Drawing.Size(690, 320)  # Increased height from 220 to 320
 $detailsBox.Text = "User Details"
 $form.Controls.Add($detailsBox)
 
 # Create detailsText - a rich text box to display detailed user properties
 $detailsText = New-Object System.Windows.Forms.RichTextBox
 $detailsText.Location = New-Object System.Drawing.Point(15, 25)
-$detailsText.Size = New-Object System.Drawing.Size(660, 180)
+$detailsText.Size = New-Object System.Drawing.Size(660, 280)  # Increased height from 180 to 280
 $detailsText.ReadOnly = $true
 $detailsText.Font = New-Object System.Drawing.Font("Consolas", 9)
 $detailsBox.Controls.Add($detailsText)
@@ -213,11 +252,16 @@ function Search-ADUsers {
                 $item.SubItems.Add($user.DisplayName)
             }
             
-            # Add Enabled status with null checking
+            # Add Enabled status with null checking and color coding
             if ($null -eq $user.Enabled) {
                 $item.SubItems.Add("Unknown")
+                $item.ForeColor = [System.Drawing.Color]::Gray
             } else {
                 $item.SubItems.Add($user.Enabled.ToString())
+                # Color coding for disabled accounts
+                if ($user.Enabled -eq $false) {
+                    $item.ForeColor = [System.Drawing.Color]::Red
+                }
             }
             
             # Add LockedOut status with null checking
@@ -225,6 +269,10 @@ function Search-ADUsers {
                 $item.SubItems.Add("Unknown")
             } else {
                 $item.SubItems.Add($user.LockedOut.ToString())
+                # Additional color coding for locked accounts
+                if ($user.LockedOut -eq $true) {
+                    $item.ForeColor = [System.Drawing.Color]::DarkOrange
+                }
             }
             
             # Add Department with null checking
@@ -284,11 +332,46 @@ function Get-UserDetails {
         
         [void]$sb.AppendLine("ACCOUNT STATUS")
         [void]$sb.AppendLine("====================")
-        [void]$sb.AppendLine("Account Enabled: $($user.Enabled)")
-        [void]$sb.AppendLine("Account Locked: $($user.LockedOut)")
-        [void]$sb.AppendLine("Password Never Expires: $($user.PasswordNeverExpires)")
-        [void]$sb.AppendLine("Password Last Set: $(Convert-ADDateTime $user.pwdLastSet)")
         
+        # Write the formatted output first
+        $detailsText.Text = $sb.ToString()
+        
+        # Now add the status information with proper coloring
+        $detailsText.SelectionFont = New-Object System.Drawing.Font("Consolas", 9)
+        $detailsText.AppendText("Account Enabled: ")
+        
+        # Set appropriate color based on enabled status
+        if ($user.Enabled) {
+            $detailsText.SelectionColor = [System.Drawing.Color]::Green
+        } else {
+            $detailsText.SelectionColor = [System.Drawing.Color]::Red
+        }
+        $detailsText.AppendText("$($user.Enabled)")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black # Reset color
+        $detailsText.AppendText("`r`n")
+        
+        # Add locked status with coloring
+        $detailsText.AppendText("Account Locked: ")
+        if ($user.LockedOut) {
+            $detailsText.SelectionColor = [System.Drawing.Color]::Red
+        } else {
+            $detailsText.SelectionColor = [System.Drawing.Color]::Green
+        }
+        $detailsText.AppendText("$($user.LockedOut)")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black # Reset color
+        $detailsText.AppendText("`r`n")
+        
+        # Add password never expires status with coloring
+        $detailsText.AppendText("Password Never Expires: ")
+        if ($user.PasswordNeverExpires) {
+            $detailsText.SelectionColor = [System.Drawing.Color]::Blue
+        }
+        $detailsText.AppendText("$($user.PasswordNeverExpires)")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black # Reset color
+        $detailsText.AppendText("`r`n")
+        
+        # Add password last set
+        $detailsText.AppendText("Password Last Set: $(Convert-ADDateTime $user.pwdLastSet)`r`n")
         # Calculate password expiration
         if (!$user.PasswordNeverExpires -and $user.pwdLastSet -ne 0) {
             try {
@@ -296,29 +379,58 @@ function Get-UserDetails {
                 if ($maxPwdAge -gt 0) {
                     $pwdLastSet = [DateTime]::FromFileTime([Int64]::Parse($user.pwdLastSet))
                     $pwdExpires = $pwdLastSet.AddDays($maxPwdAge)
-                    [void]$sb.AppendLine("Password Expires: $($pwdExpires.ToString('yyyy-MM-dd HH:mm:ss'))")
+                    $passwordExpiresText = $pwdExpires.ToString('yyyy-MM-dd HH:mm:ss')
+                    $detailsText.AppendText("Password Expires: $passwordExpiresText`r`n")
+                    
                     $daysLeft = ($pwdExpires - (Get-Date)).Days
-                    [void]$sb.AppendLine("Days Until Expiration: $daysLeft")
+                    
+                    # Add days until expiration with color coding based on urgency
+                    $detailsText.AppendText("Days Until Expiration: ")
+                    
+                    # Color code based on how soon the password expires
+                    if ($daysLeft -le 5) {
+                        $detailsText.SelectionColor = [System.Drawing.Color]::Red
+                    } elseif ($daysLeft -le 14) {
+                        $detailsText.SelectionColor = [System.Drawing.Color]::Orange
+                    } else {
+                        $detailsText.SelectionColor = [System.Drawing.Color]::Green
+                    }
+                    $detailsText.AppendText("$daysLeft")
+                    $detailsText.SelectionColor = [System.Drawing.Color]::Black # Reset color
+                    $detailsText.AppendText("`r`n")
+                    
                 } else {
-                    [void]$sb.AppendLine("Password Expiration: Unable to determine (domain policy not available)")
+                    $detailsText.AppendText("Password Expiration: Unable to determine (domain policy not available)`r`n")
                 }
             } catch {
-                [void]$sb.AppendLine("Password Expiration: Error calculating ($($_.Exception.Message))")
+                $detailsText.AppendText("Password Expiration: Error calculating ($($_.Exception.Message))`r`n")
             }
         } else {
-            [void]$sb.AppendLine("Password Expiration: Not applicable")
+            $detailsText.AppendText("Password Expiration: Not applicable`r`n")
         }
         
-        [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("LOGIN INFORMATION")
-        [void]$sb.AppendLine("====================")
-        [void]$sb.AppendLine("Last Logon: $(Convert-ADDateTime $user.lastLogonTimestamp)")
-        [void]$sb.AppendLine("Bad Logon Count: $($user.badPwdCount)")
-        [void]$sb.AppendLine("Account Expires: $(if ($user.AccountExpirationDate) { $user.AccountExpirationDate.ToString('yyyy-MM-dd') } else { 'Never' })")
+        # Add login information section
+        $detailsText.AppendText("`r`nLOGIN INFORMATION`r`n")
+        $detailsText.AppendText("====================")
+        $detailsText.AppendText("`r`n")
+        $detailsText.AppendText("Last Logon: $(Convert-ADDateTime $user.lastLogonTimestamp)`r`n")
+        $detailsText.AppendText("Bad Logon Count: $($user.badPwdCount)`r`n")
         
-        [void]$sb.AppendLine("")
-        [void]$sb.AppendLine("GROUPS MEMBERSHIP")
-        [void]$sb.AppendLine("====================")
+        # Add account expiration with proper formatting
+        $detailsText.AppendText("Account Expires: ")
+        if ($user.AccountExpirationDate) {
+            $expiryDate = $user.AccountExpirationDate.ToString('yyyy-MM-dd')
+            $detailsText.AppendText("$expiryDate`r`n")
+        } else {
+            $detailsText.SelectionColor = [System.Drawing.Color]::Green
+            $detailsText.AppendText("Never`r`n")
+            $detailsText.SelectionColor = [System.Drawing.Color]::Black # Reset color
+        }
+        
+        # Add group membership section
+        $detailsText.AppendText("`r`nGROUPS MEMBERSHIP`r`n")
+        $detailsText.AppendText("====================")
+        $detailsText.AppendText("`r`n")
         try {
             # Get group membership using the MemberOf property instead of Get-ADPrincipalGroupMembership
             $groups = $user.MemberOf | ForEach-Object {
@@ -327,21 +439,56 @@ function Get-UserDetails {
             
             if ($groups -and $groups.Count -gt 0) {
                 foreach ($group in $groups) {
-                    [void]$sb.AppendLine("- $group")
+                    $detailsText.AppendText("- $group`r`n")
                 }
             } else {
-                [void]$sb.AppendLine("No group memberships found")
+                $detailsText.AppendText("No group memberships found`r`n")
             }
         } catch {
-            [void]$sb.AppendLine("Error retrieving group membership: $($_.Exception.Message)")
+            $detailsText.AppendText("Error retrieving group membership: $($_.Exception.Message)`r`n")
         }
         
-        # Display the formatted output
-        $detailsText.Text = $sb.ToString()
+        # Add a legend explaining the color coding
+        $detailsText.AppendText("`r`nCOLOR LEGEND`r`n")
+        $detailsText.AppendText("====================")
+        $detailsText.AppendText("`r`n")
+        
+        # Green legend
+        $detailsText.AppendText("")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Green
+        $detailsText.AppendText("Green")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black
+        $detailsText.AppendText(": Good Status`r`n")
+        
+        # Red legend
+        $detailsText.AppendText("")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Red
+        $detailsText.AppendText("Red")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black
+        $detailsText.AppendText(": Issue Needing Attention`r`n")
+        
+        # Orange legend
+        $detailsText.AppendText("")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Orange
+        $detailsText.AppendText("Orange")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black
+        $detailsText.AppendText(": Warning`r`n")
+        
+        # Blue legend
+        $detailsText.AppendText("")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Blue
+        $detailsText.AppendText("Blue")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black
+        $detailsText.AppendText(": Special Configuration`r`n")
+        
+        # Set the status
         $statusLabel.Text = "User details loaded"
     }
     catch {
-        $detailsText.Text = "Error retrieving user details: $($_.Exception.Message)"
+        $detailsText.Text = ""
+        $detailsText.SelectionColor = [System.Drawing.Color]::Red
+        $detailsText.AppendText("Error retrieving user details: $($_.Exception.Message)")
+        $detailsText.SelectionColor = [System.Drawing.Color]::Black
         $statusLabel.Text = "Error retrieving user details"
         Write-Error $_.Exception.Message
     }
@@ -484,8 +631,12 @@ function Export-UserToHTML {
         .footer { font-size: 12px; color: #666; margin-top: 30px; }
         .status-enabled { color: green; font-weight: bold; }
         .status-disabled { color: red; font-weight: bold; }
+        .status-warning { color: #FF8C00; font-weight: bold; } /* Dark Orange */
+        .status-special { color: blue; font-weight: bold; }
         .groups-list { list-style-type: none; padding-left: 0; }
         .groups-list li { padding: 3px 0; }
+        .legend { display: flex; margin-bottom: 10px; }
+        .legend-item { margin-right: 20px; }
     </style>
 </head>
 <body>
@@ -508,6 +659,14 @@ function Export-UserToHTML {
         
         <div class="section">
             <h2>Account Status</h2>
+            
+            <div class="legend">
+                <div class="legend-item"><span class="status-enabled">■</span> Good Status</div>
+                <div class="legend-item"><span class="status-disabled">■</span> Issue Needing Attention</div>
+                <div class="legend-item"><span class="status-warning">■</span> Warning</div>
+                <div class="legend-item"><span class="status-special">■</span> Special Configuration</div>
+            </div>
+            
             <table>
                 <tr>
                     <th>Account Enabled</th>
@@ -517,10 +676,17 @@ function Export-UserToHTML {
                     <th>Account Locked</th>
                     <td class="$(if ($user.LockedOut) { 'status-disabled' } else { 'status-enabled' })">$($user.LockedOut)</td>
                 </tr>
-                <tr><th>Password Never Expires</th><td>$($user.PasswordNeverExpires)</td></tr>
+                <tr>
+                    <th>Password Never Expires</th>
+                    <td class="$(if ($user.PasswordNeverExpires) { 'status-special' } else { '' })">$($user.PasswordNeverExpires)</td>
+                </tr>
                 <tr><th>Password Last Set</th><td>$(Convert-ADDateTime $user.pwdLastSet)</td></tr>
                 <tr><th>Password Expires</th><td>$passwordExpires</td></tr>
-                <tr><th>Days Until Expiration</th><td>$daysLeft</td></tr>
+                
+                <tr>
+                    <th>Days Until Expiration</th>
+                    <td class="$(if ($daysLeft -le 5) { 'status-disabled' } elseif ($daysLeft -le 14) { 'status-warning' } elseif ($daysLeft -gt 14) { 'status-enabled' } else { '' })">$daysLeft</td>
+                </tr>
             </table>
         </div>
         
@@ -643,6 +809,346 @@ function Get-UserDetails {
         $exportButton.Enabled = $false
     }
 }
+
+# Function to unlock a user account
+function Unlock-UserAccount {
+    param([string]$Username)
+    
+    try {
+        $statusLabel.Text = "Unlocking account for " + $Username + "..."
+        $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+        
+        # Attempt to unlock the account
+        Unlock-ADAccount -Identity $Username -ErrorAction Stop
+        
+        # Show success message
+        [System.Windows.Forms.MessageBox]::Show(
+            "Account for " + $Username + " has been successfully unlocked.", 
+            "Unlock Account", 
+            [System.Windows.Forms.MessageBoxButtons]::OK, 
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        )
+        
+        # Refresh user details to show updated status
+        Get-UserDetails -Username $Username
+        $statusLabel.Text = "Account unlocked for " + $Username
+        
+        # Update the selected item in the list view
+        if ($resultsList.SelectedItems.Count -gt 0) {
+            $selectedIndex = $resultsList.SelectedIndices[0]
+            $resultsList.Items[$selectedIndex].SubItems[3].Text = "False" # Update Locked Out column
+            $resultsList.Items[$selectedIndex].ForeColor = [System.Drawing.Color]::Black # Reset color
+        }
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Error unlocking account: $($_.Exception.Message)", 
+            "Unlock Account Error", 
+            [System.Windows.Forms.MessageBoxButtons]::OK, 
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+        $statusLabel.Text = "Error unlocking account"
+        Write-Error $_.Exception.Message
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+    }
+}
+
+# Function to reset a user's password
+function Reset-UserPassword {
+    param([string]$Username)
+    
+    try {
+        # Create a form for password reset
+        $resetForm = New-Object System.Windows.Forms.Form
+        $resetForm.Text = "Reset Password for $Username"
+        $resetForm.Size = New-Object System.Drawing.Size(400, 250)
+        $resetForm.StartPosition = "CenterParent"
+        $resetForm.FormBorderStyle = "FixedDialog"
+        $resetForm.MaximizeBox = $false
+        $resetForm.MinimizeBox = $false
+        $resetForm.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        
+        # Create password label
+        $passwordLabel = New-Object System.Windows.Forms.Label
+        $passwordLabel.Location = New-Object System.Drawing.Point(20, 20)
+        $passwordLabel.Size = New-Object System.Drawing.Size(350, 20)
+        $passwordLabel.Text = "Enter new password for " + $Username + ":"
+        $resetForm.Controls.Add($passwordLabel)
+        
+        # Create password textbox
+        $passwordBox = New-Object System.Windows.Forms.TextBox
+        $passwordBox.Location = New-Object System.Drawing.Point(20, 45)
+        $passwordBox.Size = New-Object System.Drawing.Size(350, 25)
+        $passwordBox.PasswordChar = '*'
+        $resetForm.Controls.Add($passwordBox)
+        
+        # Create confirm password label
+        $confirmLabel = New-Object System.Windows.Forms.Label
+        $confirmLabel.Location = New-Object System.Drawing.Point(20, 80)
+        $confirmLabel.Size = New-Object System.Drawing.Size(350, 20)
+        $confirmLabel.Text = "Confirm new password:"
+        $resetForm.Controls.Add($confirmLabel)
+        
+        # Create confirm password textbox
+        $confirmBox = New-Object System.Windows.Forms.TextBox
+        $confirmBox.Location = New-Object System.Drawing.Point(20, 105)
+        $confirmBox.Size = New-Object System.Drawing.Size(350, 25)
+        $confirmBox.PasswordChar = '*'
+        $resetForm.Controls.Add($confirmBox)
+        
+        # Create checkbox for "User must change password at next logon"
+        $mustChangeBox = New-Object System.Windows.Forms.CheckBox
+        $mustChangeBox.Location = New-Object System.Drawing.Point(20, 140)
+        $mustChangeBox.Size = New-Object System.Drawing.Size(350, 20)
+        $mustChangeBox.Text = "User must change password at next logon"
+        $mustChangeBox.Checked = $true
+        $resetForm.Controls.Add($mustChangeBox)
+        
+        # Create reset button
+        $resetButton = New-Object System.Windows.Forms.Button
+        $resetButton.Location = New-Object System.Drawing.Point(110, 170)
+        $resetButton.Size = New-Object System.Drawing.Size(80, 30)
+        $resetButton.Text = "Reset"
+        $resetButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $resetForm.AcceptButton = $resetButton
+        $resetForm.Controls.Add($resetButton)
+        
+        # Create cancel button
+        $cancelButton = New-Object System.Windows.Forms.Button
+        $cancelButton.Location = New-Object System.Drawing.Point(200, 170)
+        $cancelButton.Size = New-Object System.Drawing.Size(80, 30)
+        $cancelButton.Text = "Cancel"
+        $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+        $resetForm.CancelButton = $cancelButton
+        $resetForm.Controls.Add($cancelButton)
+        
+        # Show the form and process the result
+        $result = $resetForm.ShowDialog()
+        
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+            $newPassword = $passwordBox.Text
+            $confirmPassword = $confirmBox.Text
+            $mustChange = $mustChangeBox.Checked
+            
+            # Validate password
+            if ([string]::IsNullOrWhiteSpace($newPassword)) {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Password cannot be empty.", 
+                    "Password Error", 
+                    [System.Windows.Forms.MessageBoxButtons]::OK, 
+                    [System.Windows.Forms.MessageBoxIcon]::Error
+                )
+                return
+            }
+            
+            if ($newPassword -ne $confirmPassword) {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Passwords do not match.", 
+                    "Password Error", 
+                    [System.Windows.Forms.MessageBoxButtons]::OK, 
+                    [System.Windows.Forms.MessageBoxIcon]::Error
+                )
+                return
+            }
+            
+            $statusLabel.Text = "Resetting password for " + $Username + "..."
+            $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+            
+            # Convert plain text password to secure string
+            $securePassword = ConvertTo-SecureString -String $newPassword -AsPlainText -Force
+            
+            # Reset the password
+            Set-ADAccountPassword -Identity $Username -NewPassword $securePassword -Reset -ErrorAction Stop
+            
+            # Set 'User must change password at next logon' if checked
+            if ($mustChange) {
+                Set-ADUser -Identity $Username -ChangePasswordAtLogon $true -ErrorAction Stop
+            }
+            
+            # Show success message
+            [System.Windows.Forms.MessageBox]::Show(
+                "Password for " + $Username + " has been successfully reset." + 
+                $(if ($mustChange) { "`nUser will be required to change password at next logon." } else { "" }), 
+                "Password Reset", 
+                [System.Windows.Forms.MessageBoxButtons]::OK, 
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
+            
+            # Refresh user details to show updated status
+            Get-UserDetails -Username $Username
+            $statusLabel.Text = "Password reset for " + $Username
+        }
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Error resetting password: $($_.Exception.Message)", 
+            "Password Reset Error", 
+            [System.Windows.Forms.MessageBoxButtons]::OK, 
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+        $statusLabel.Text = "Error resetting password"
+        Write-Error $_.Exception.Message
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+    }
+}
+
+# Function to enable or disable a user account
+function Toggle-UserAccountStatus {
+    param(
+        [string]$Username,
+        [bool]$CurrentStatus
+    )
+    
+    try {
+        $action = if ($CurrentStatus) { "disable" } else { "enable" }
+        
+        # Ask for confirmation
+        $confirmResult = [System.Windows.Forms.MessageBox]::Show(
+            "Are you sure you want to " + $action + " the account for " + $Username + "?",
+            "Confirm Account $($action.Substring(0,1).ToUpper() + $action.Substring(1))",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+        
+        if ($confirmResult -eq [System.Windows.Forms.DialogResult]::Yes) {
+            $statusLabel.Text = $($action.Substring(0,1).ToUpper() + $action.Substring(1)) + "ing account for " + $Username + "..."
+            $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+            
+            # Enable or disable the account
+            if ($CurrentStatus) {
+                # Disable account
+                Disable-ADAccount -Identity $Username -ErrorAction Stop
+            } else {
+                # Enable account
+                Enable-ADAccount -Identity $Username -ErrorAction Stop
+            }
+            
+            # Show success message
+            [System.Windows.Forms.MessageBox]::Show(
+                "Account for " + $Username + " has been successfully " + $action + "d.",
+                "Account $($action.Substring(0,1).ToUpper() + $action.Substring(1))d",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
+            
+            # Update the selected item in the list view
+            if ($resultsList.SelectedItems.Count -gt 0) {
+                $selectedIndex = $resultsList.SelectedIndices[0]
+                $newStatus = !$CurrentStatus
+                $resultsList.Items[$selectedIndex].SubItems[2].Text = $newStatus.ToString() # Update Enabled column
+                
+                # Update color coding
+                if (!$newStatus) {
+                    $resultsList.Items[$selectedIndex].ForeColor = [System.Drawing.Color]::Red
+                } else {
+                    # Reset color unless locked out
+                    $lockedStatus = $resultsList.Items[$selectedIndex].SubItems[3].Text
+                    if ($lockedStatus -eq "True") {
+                        $resultsList.Items[$selectedIndex].ForeColor = [System.Drawing.Color]::DarkOrange
+                    } else {
+                        $resultsList.Items[$selectedIndex].ForeColor = [System.Drawing.Color]::Black
+                    }
+                }
+            }
+            
+            # Refresh user details to show updated status
+            Get-UserDetails -Username $Username
+            $statusLabel.Text = "Account " + $action + "d for " + $Username
+        }
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Error ${action}ing account: $($_.Exception.Message)",
+            "Account $($action.Substring(0,1).ToUpper() + $action.Substring(1)) Error",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+        $statusLabel.Text = "Error ${action}ing account"
+        Write-Error $_.Exception.Message
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+    }
+}
+
+# Function to update context menu item state based on user account status
+function UpdateContextMenuState {
+    param([Microsoft.ActiveDirectory.Management.ADUser]$User)
+    
+    # Update menu items based on user properties
+    if ($User) {
+        # Unlock account - enable only if account is locked
+        $unlockAccountMenuItem.Enabled = $User.LockedOut
+        
+        # Reset password - always enabled for valid user
+        $resetPasswordMenuItem.Enabled = $true
+        
+        # Enable/Disable account - always enabled for valid user, text changes based on current state
+        $toggleAccountMenuItem.Enabled = $true
+        $toggleAccountMenuItem.Text = if ($User.Enabled) { "Disable Account" } else { "Enable Account" }
+        
+        # Refresh - always enabled for valid user
+        $refreshMenuItem.Enabled = $true
+    } else {
+        # Disable all menu items if no valid user
+        $unlockAccountMenuItem.Enabled = $false
+        $resetPasswordMenuItem.Enabled = $false
+        $toggleAccountMenuItem.Enabled = $false
+        $refreshMenuItem.Enabled = $false
+    }
+}
+
+# Update the Get-UserDetails function to call UpdateContextMenuState
+# Add this line to the Get-UserDetails function before the "return $user" line:
+# UpdateContextMenuState -User $user
+
+# Add these event handlers before the "Show the form" line at the end of the script:
+$unlockAccountMenuItem.Add_Click({
+    if ($resultsList.SelectedItems.Count -gt 0) {
+        $selectedUsername = $resultsList.SelectedItems[0].Tag
+        Unlock-UserAccount -Username $selectedUsername
+    }
+})
+
+$resetPasswordMenuItem.Add_Click({
+    if ($resultsList.SelectedItems.Count -gt 0) {
+        $selectedUsername = $resultsList.SelectedItems[0].Tag
+        Reset-UserPassword -Username $selectedUsername
+    }
+})
+
+$toggleAccountMenuItem.Add_Click({
+    if ($resultsList.SelectedItems.Count -gt 0) {
+        $selectedUsername = $resultsList.SelectedItems[0].Tag
+        $user = Get-ADUser -Identity $selectedUsername -Properties Enabled
+        Toggle-UserAccountStatus -Username $selectedUsername -CurrentStatus $user.Enabled
+    }
+})
+
+$refreshMenuItem.Add_Click({
+    if ($resultsList.SelectedItems.Count -gt 0) {
+        $selectedUsername = $resultsList.SelectedItems[0].Tag
+        Get-UserDetails -Username $selectedUsername
+        $statusLabel.Text = "User details refreshed"
+    }
+})
+
+# Add right-click support for the results list
+$resultsList.Add_MouseUp({
+    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
+        if ($resultsList.SelectedItems.Count -gt 0) {
+            # Context menu will show automatically since it's assigned to the ListView
+            # But we ensure items are properly enabled/disabled
+            $selectedUsername = $resultsList.SelectedItems[0].Tag
+            $user = Get-ADUser -Identity $selectedUsername -Properties Enabled, LockedOut
+            UpdateContextMenuState -User $user
+        }
+    }
+})
 
 # Show the form
 [void]$form.ShowDialog()
