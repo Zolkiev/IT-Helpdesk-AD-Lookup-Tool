@@ -5,7 +5,8 @@ This document outlines the planned development path for the IT Helpdesk AD Looku
 ## Short-term Goals (1-3 months)
 
 ### Version 0.2.0
-- Add export functionality for user details (CSV, HTML)
+- ✅ Add export functionality for user details (CSV, HTML)
+- ✅ Improve search by searching across multiple fields simultaneously
 - Implement user actions menu (unlock account, reset password)
 - Add visual indicators for account status (color coding)
 - Improve search performance for large directories
